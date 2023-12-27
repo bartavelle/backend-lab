@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-
 use common::{AuthInfo, Counter, Perf, PreAuthInfo};
 use rand::{rngs::OsRng, RngCore};
-use services::perf::get_perf_code;
+use std::collections::HashMap;
 use tokio::sync::RwLock;
 use warp::Filter;
 
-use crate::services::auth::AuthResult;
+use services::auth::AuthResult;
+use services::perf::get_perf_code;
 
 mod services;
 
@@ -26,6 +25,10 @@ fn generate_cookie() -> String {
 }
 
 async fn handle_auth(info: AuthInfo) -> Option<String> {
+    todo!()
+}
+
+async fn get_counters(cookie: &str) -> Option<Counter> {
     todo!()
 }
 
@@ -65,7 +68,76 @@ async fn main() {
             }
         });
 
-    let routes = preauth.or(perf).or(auth);
+    let counters = warp::path!("counters")
+        .and(warp::filters::cookie::cookie::<String>("AUTH"))
+        .then(|cookie: String| async move { warp::reply::json(&get_counters(&cookie).await) });
+
+    let routes = preauth.or(perf).or(auth).or(counters);
 
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+}
+
+#[cfg(test)]
+mod test {
+    use common::{hash_username, PerfToken};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn authentication_ok() {
+        for i in 0_u32..10 {
+            let username = format!("user{}", i);
+            let nonce = handle_preauth(PreAuthInfo {
+                username: username.clone(),
+            })
+            .await;
+            let token = hash_username(&username, nonce);
+            let r = handle_auth(AuthInfo { username, token }).await;
+            assert!(r.is_some());
+        }
+    }
+
+    #[tokio::test]
+    async fn authentication_bad() {
+        for i in 0_u32..10 {
+            let username = format!("user{}", i);
+            let nonce = handle_preauth(PreAuthInfo {
+                username: username.clone(),
+            })
+            .await;
+            let token = hash_username(&username, nonce).overflowing_add(1).0;
+            let r = handle_auth(AuthInfo { username, token }).await;
+            assert!(r.is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn perf() {
+        let username = "user".to_string();
+        let nonce = handle_preauth(PreAuthInfo {
+            username: username.clone(),
+        })
+        .await;
+        let token = hash_username(&username, nonce);
+        let cookie = handle_auth(AuthInfo { username, token }).await.unwrap();
+        let x = store_perf(
+            cookie.clone(),
+            Perf {
+                clicks: PerfToken::from(23),
+                pages: PerfToken::from(46),
+                speed: PerfToken::from(5645),
+            },
+        )
+        .await;
+        assert!(x);
+        let c = get_counters(&cookie).await;
+        assert_eq!(
+            c,
+            Some(Counter {
+                clicks: 23,
+                pages: 46,
+                speed: 5645
+            })
+        )
+    }
 }

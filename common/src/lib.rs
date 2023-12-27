@@ -21,7 +21,7 @@ pub struct Perf {
     pub speed: PerfToken<Speed>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, Clone, Copy, Serialize, PartialEq, Eq)]
 pub struct Counter {
     pub clicks: u64,
     pub pages: u64,
@@ -40,6 +40,15 @@ impl<A> PerfToken<A> {
     pub fn new() -> Self {
         Self {
             token: OsRng.next_u64(),
+            d: PhantomData {},
+        }
+    }
+}
+
+impl<A> From<u64> for PerfToken<A> {
+    fn from(token: u64) -> Self {
+        Self {
+            token,
             d: PhantomData {},
         }
     }
@@ -66,18 +75,9 @@ mod test {
     fn format() {
         assert_eq!(
             serde_json::to_string(&Perf {
-                clicks: PerfToken {
-                    token: 54,
-                    d: PhantomData {}
-                },
-                pages: PerfToken {
-                    token: 34,
-                    d: PhantomData {}
-                },
-                speed: PerfToken {
-                    token: 54,
-                    d: PhantomData {}
-                }
+                clicks: PerfToken::from(54),
+                pages: PerfToken::from(34),
+                speed: PerfToken::from(54),
             })
             .unwrap(),
             "{\"clicks\":54,\"pages\":34,\"speed\":54}"
