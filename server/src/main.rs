@@ -86,7 +86,7 @@ mod test {
     #[tokio::test]
     async fn authentication_ok() {
         for i in 0_u32..10 {
-            let username = format!("user{}", i);
+            let username = format!("gooduser{}", i);
             let nonce = handle_preauth(PreAuthInfo {
                 username: username.clone(),
             })
@@ -100,7 +100,7 @@ mod test {
     #[tokio::test]
     async fn authentication_bad() {
         for i in 0_u32..10 {
-            let username = format!("user{}", i);
+            let username = format!("baduser{}", i);
             let nonce = handle_preauth(PreAuthInfo {
                 username: username.clone(),
             })
